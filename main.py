@@ -151,7 +151,7 @@ async def detect_hazards_gemini(image_base64: str) -> list[dict]:
     import io
 
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.GenerativeModel("gemini-2.0-flash-exp")
     image_bytes = base64.b64decode(image_base64)
     img = PIL.Image.open(io.BytesIO(image_bytes))
     response = model.generate_content([_HAZARD_PROMPT, img])
@@ -185,7 +185,7 @@ async def detect_hazards(image_base64: str) -> tuple[list[dict], str]:
     try:
         hazards = await detect_hazards_gemini(image_base64)
         log.info("Hazard detection via Gemini Vision succeeded")
-        return hazards, "gemini-1.5-flash"
+        return hazards, "gemini-2.0-flash-exp"
     except Exception:
         import traceback
         log.warning("Gemini Vision failed — full traceback:\n%s", traceback.format_exc())

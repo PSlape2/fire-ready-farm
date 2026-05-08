@@ -144,8 +144,22 @@ def _parse_hazards(text: str) -> list[dict]:
         return []
 
 
+async def detect_hazards_gemini(image_base64: str) -> list[dict]:
+    """Primary: use Gemini Vision to detect hazards. Raises on failure."""
+    import google.generativeai as genai
+    import PIL.Image
+    import io
+
+    genai.configure(api_key=GEMINI_API_KEY)
+    model = genai.GenerativeModel("gemini-1.5-flash")
+    image_bytes = base64.b64decode(image_base64)
+    img = PIL.Image.open(io.BytesIO(image_bytes))
+    response = model.generate_content([_HAZARD_PROMPT, img])
+    return _parse_hazards(response.text)
+
+
 async def detect_hazards_grok(image_base64: str) -> list[dict]:
-    """Use Grok Vision to detect hazards. Raises on failure."""
+    """Fallback: use Grok Vision to detect hazards. Raises on failure."""
     client = OpenAI(api_key=XAI_API_KEY, base_url="https://api.x.ai/v1")
     response = client.chat.completions.create(
         model="grok-2-vision-latest",
@@ -166,40 +180,19 @@ async def detect_hazards_grok(image_base64: str) -> list[dict]:
     return _parse_hazards(response.choices[0].message.content)
 
 
-async def detect_hazards_gemini(image_base64: str) -> list[dict]:
-    """Fallback: use Gemini Vision to detect hazards."""
-    import google.generativeai as genai
-
-    genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel("gemini-1.5-flash")
-
-    image_bytes = base64.b64decode(image_base64)
-    import tempfile, pathlib
-
-    with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
-        tmp.write(image_bytes)
-        tmp_path = tmp.name
-
-    import PIL.Image
-
-    img = PIL.Image.open(tmp_path)
-    response = model.generate_content([_HAZARD_PROMPT, img])
-    pathlib.Path(tmp_path).unlink(missing_ok=True)
-    return _parse_hazards(response.text)
-
-
 async def detect_hazards(image_base64: str) -> tuple[list[dict], str]:
-    """Try Grok first, fall back to Gemini. Returns (hazards, model_used)."""
+    """Try Gemini first, fall back to Grok. Returns (hazards, model_used)."""
     try:
-        hazards = await detect_hazards_grok(image_base64)
-        log.info("Hazard detection via Grok Vision succeeded")
-        return hazards, "grok-2-vision-latest"
-    except Exception as exc:
-        log.warning("Grok Vision failed (%s), falling back to Gemini", exc)
+        hazards = await detect_hazards_gemini(image_base64)
+        log.info("Hazard detection via Gemini Vision succeeded")
+        return hazards, "gemini-1.5-flash"
+    except Exception:
+        import traceback
+        log.warning("Gemini Vision failed — full traceback:\n%s", traceback.format_exc())
 
-    hazards = await detect_hazards_gemini(image_base64)
-    log.info("Hazard detection via Gemini succeeded")
-    return hazards, "gemini-1.5-flash"
+    hazards = await detect_hazards_grok(image_base64)
+    log.info("Hazard detection via Grok Vision (fallback) succeeded")
+    return hazards, "grok-2-vision-latest"
 
 
 # ---------------------------------------------------------------------------

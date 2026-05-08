@@ -146,15 +146,18 @@ def _parse_hazards(text: str) -> list[dict]:
 
 async def detect_hazards_gemini(image_base64: str) -> list[dict]:
     """Primary: use Gemini Vision to detect hazards. Raises on failure."""
-    import google.generativeai as genai
-    import PIL.Image
-    import io
+    from google import genai
+    from google.genai import types
 
-    genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel("gemini-2.0-flash-exp")
+    client = genai.Client(api_key=GEMINI_API_KEY)
     image_bytes = base64.b64decode(image_base64)
-    img = PIL.Image.open(io.BytesIO(image_bytes))
-    response = model.generate_content([_HAZARD_PROMPT, img])
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=[
+            types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
+            _HAZARD_PROMPT,
+        ],
+    )
     return _parse_hazards(response.text)
 
 
@@ -185,7 +188,7 @@ async def detect_hazards(image_base64: str) -> tuple[list[dict], str]:
     try:
         hazards = await detect_hazards_gemini(image_base64)
         log.info("Hazard detection via Gemini Vision succeeded")
-        return hazards, "gemini-2.0-flash-exp"
+        return hazards, "gemini-2.0-flash"
     except Exception:
         import traceback
         log.warning("Gemini Vision failed — full traceback:\n%s", traceback.format_exc())
@@ -291,12 +294,62 @@ def print_analysis(result: dict) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Startup self-test
+# ---------------------------------------------------------------------------
+
+@app.on_event("startup")
+async def startup_checks() -> None:
+    print("\n" + "=" * 60)
+    print(f"{_BOLD}Wildfire Detector — Startup Checks{_RESET}")
+    print("=" * 60)
+
+    # 1. OpenWeatherMap
+    try:
+        weather = await fetch_weather(32.8801, -117.2340)
+        print(
+            f"  \033[92m[PASS]\033[0m OpenWeatherMap — "
+            f"temp={weather['temperature_f']}°F  "
+            f"humidity={weather['humidity_pct']}%  "
+            f"wind={weather['wind_mph']} mph"
+        )
+    except Exception as exc:
+        print(f"  \033[91m[FAIL]\033[0m OpenWeatherMap — {exc}")
+
+    # 2. Gemini API (text-only ping, no image needed)
+    try:
+        from google import genai
+
+        client = genai.Client(api_key=GEMINI_API_KEY)
+        resp = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents="Reply with exactly one word: OK",
+        )
+        print(f"  \033[92m[PASS]\033[0m Gemini API — response: {resp.text.strip()[:80]}")
+    except Exception as exc:
+        print(f"  \033[91m[FAIL]\033[0m Gemini API — {exc}")
+
+    print("=" * 60 + "\n")
+
+
+# ---------------------------------------------------------------------------
 # Issue #6 — API endpoints
 # ---------------------------------------------------------------------------
 
 @app.get("/health")
 async def health():
     return {"status": "ok", "timestamp": datetime.now(timezone.utc).isoformat()}
+
+
+@app.get("/weather")
+async def weather_endpoint(lat: float, lon: float):
+    try:
+        weather = await fetch_weather(lat, lon)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Weather fetch failed: {exc}")
+    ffwi_score, risk_level = calculate_ffwi(
+        weather["temperature_f"], weather["humidity_pct"], weather["wind_mph"]
+    )
+    return {**weather, "ffwi_score": ffwi_score, "risk_level": risk_level}
 
 
 @app.post("/analyze")

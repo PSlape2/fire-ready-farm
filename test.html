@@ -313,9 +313,31 @@
     setTimeout(() => { toast.style.display = 'none'; }, 4000);
   }
 
+  // Fetch weather independently so it displays even if vision analysis fails.
+  async function fetchWeather() {
+    try {
+      const resp = await fetch(`${API_BASE}/weather?lat=${GPS.lat}&lon=${GPS.lon}`);
+      if (!resp.ok) return;
+      const w = await resp.json();
+      document.getElementById('w-temp').textContent  = w.temperature_f;
+      document.getElementById('w-hum').textContent   = w.humidity_pct;
+      document.getElementById('w-wind').textContent  = w.wind_mph;
+      document.getElementById('ffwi-score').textContent = w.ffwi_score.toFixed(1);
+      const riskEl = document.getElementById('risk-level');
+      riskEl.textContent = w.risk_level;
+      riskEl.className = 'risk-' + w.risk_level;
+    } catch (_) {
+      // non-critical — weather strip stays at last known value
+    }
+  }
+
   async function scanFrame() {
     statusDot.classList.add('scanning');
     statusText.textContent = 'Analyzing…';
+
+    // Always update weather first — if vision fails below, the strip still shows current data.
+    await fetchWeather();
+
     try {
       const b64 = captureFrame();
       const resp = await fetch(`${API_BASE}/analyze`, {

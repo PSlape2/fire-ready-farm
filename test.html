@@ -30,8 +30,33 @@
     #topbar h1 { font-size: 1rem; font-weight: 600; letter-spacing: .03em; }
     #topbar h1 span { color: #f78166; }
 
-    /* ── FFWI Badge ── */
+    /* ── Status + interval controls ── */
+    #status-wrap { display:flex; align-items:center; gap:10px; font-size:.82rem; color:#8b949e; }
+    #status-dot {
+      width:10px; height:10px; border-radius:50%; flex-shrink:0;
+      background:#238636; box-shadow:0 0 6px #238636;
+    }
+    #status-dot.scanning { background:#f78166; box-shadow:0 0 6px #f78166; animation:pulse 1s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+    #interval-wrap {
+      display:flex; align-items:center; gap:6px;
+      background:#21262d; border:1px solid #30363d; border-radius:6px;
+      padding:4px 10px; font-size:.75rem;
+    }
+    #interval-wrap label { color:#8b949e; white-space:nowrap; }
+    #interval-wrap b { color:#e6edf3; min-width:24px; display:inline-block; }
+    #interval-slider {
+      width:90px; cursor:pointer;
+      accent-color:#f78166;
+    }
+
+    /* ── FFWI Badge — fixed top-right ── */
     #ffwi-badge {
+      position: fixed;
+      top: 10px;
+      right: 18px;
+      z-index: 200;
       display: flex;
       align-items: center;
       gap: 12px;
@@ -39,11 +64,12 @@
       border: 1px solid #30363d;
       border-radius: 8px;
       padding: 6px 14px;
-      min-width: 180px;
+      min-width: 170px;
       justify-content: center;
+      box-shadow: 0 2px 12px rgba(0,0,0,.5);
     }
     #ffwi-score { font-size: 1.5rem; font-weight: 700; }
-    #ffwi-label { font-size: 0.7rem; color: #8b949e; text-transform: uppercase; letter-spacing: .08em; }
+    #ffwi-label { font-size: 0.65rem; color: #8b949e; text-transform: uppercase; letter-spacing: .08em; }
     #risk-level {
       font-size: 0.85rem;
       font-weight: 700;
@@ -54,15 +80,6 @@
     .risk-Moderate { background:#3d2e00; color:#e3b341; }
     .risk-High     { background:#3d1300; color:#f78166; }
     .risk-Extreme  { background:#2d1040; color:#d2a8ff; }
-
-    /* ── Status dot ── */
-    #status-wrap { display:flex; align-items:center; gap:8px; font-size:.82rem; color:#8b949e; }
-    #status-dot {
-      width:10px; height:10px; border-radius:50%;
-      background:#238636; box-shadow:0 0 6px #238636;
-    }
-    #status-dot.scanning { background:#f78166; box-shadow:0 0 6px #f78166; animation:pulse 1s infinite; }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
 
     /* ── Main area ── */
     #main {
@@ -80,11 +97,7 @@
       align-items: center;
       justify-content: center;
     }
-    #video {
-      max-width: 100%;
-      max-height: 100%;
-      object-fit: contain;
-    }
+    #video { max-width: 100%; max-height: 100%; object-fit: contain; }
     canvas { display: none; }
 
     #cam-overlay {
@@ -118,11 +131,7 @@
       flex-shrink: 0;
     }
 
-    #hazard-list {
-      flex: 1;
-      overflow-y: auto;
-      padding: 10px;
-    }
+    #hazard-list { flex: 1; overflow-y: auto; padding: 10px; }
 
     .hazard-card {
       background: #21262d;
@@ -147,13 +156,10 @@
     .badge-COULD  { background:#0d2c56; color:#58a6ff; }
     .badge-MAY    { background:#1a4731; color:#56d364; }
 
-    .hazard-name { font-size:.82rem; font-weight:600; }
-    .hazard-loc  { font-size:.72rem; color:#8b949e; margin-bottom:4px; }
+    .hazard-name   { font-size:.82rem; font-weight:600; }
+    .hazard-loc    { font-size:.72rem; color:#8b949e; margin-bottom:4px; }
     .hazard-action { font-size:.75rem; color:#c9d1d9; line-height:1.4; }
-
-    .no-hazards {
-      text-align:center; color:#8b949e; font-size:.82rem; padding:40px 20px;
-    }
+    .no-hazards    { text-align:center; color:#8b949e; font-size:.82rem; padding:40px 20px; }
 
     /* ── Weather strip ── */
     #weather-strip {
@@ -196,17 +202,23 @@
 <!-- Top bar -->
 <div id="topbar">
   <h1>🔥 Wildfire <span>Hazard Detector</span></h1>
-  <div id="ffwi-badge">
-    <div>
-      <div id="ffwi-label">FFWI</div>
-      <div id="ffwi-score">—</div>
-    </div>
-    <span id="risk-level" class="risk-Low">—</span>
-  </div>
   <div id="status-wrap">
     <div id="status-dot"></div>
     <span id="status-text">Initializing…</span>
+    <div id="interval-wrap">
+      <label>Interval: <b id="interval-val">8s</b></label>
+      <input type="range" id="interval-slider" min="5" max="30" value="8" step="1" />
+    </div>
   </div>
+</div>
+
+<!-- FFWI badge — fixed top-right, always visible -->
+<div id="ffwi-badge">
+  <div>
+    <div id="ffwi-label">FFWI</div>
+    <div id="ffwi-score">—</div>
+  </div>
+  <span id="risk-level" class="risk-Low">—</span>
 </div>
 
 <!-- Main -->
@@ -228,7 +240,7 @@
       <span>🌡 <b id="w-temp">—</b>°F</span>
       <span>💧 <b id="w-hum">—</b>%</span>
       <span>💨 <b id="w-wind">—</b> mph</span>
-      <span>📍 Overall: <b id="w-score">—</b>/5</span>
+      <span>📍 Score: <b id="w-score">—</b>/5</span>
     </div>
     <details id="json-drawer">
       <summary>Raw JSON response</summary>
@@ -240,21 +252,32 @@
 <div id="error-toast"></div>
 
 <script>
-  const API_BASE = 'http://localhost:8000';
-  const GPS = { lat: 32.8801, lon: -117.2340 };
-  const INTERVAL_MS = 3000;
+  const API_BASE   = 'http://localhost:8000';
+  const GPS        = { lat: 32.8801, lon: -117.2340 };
 
-  const video    = document.getElementById('video');
-  const canvas   = document.getElementById('canvas');
-  const ctx      = canvas.getContext('2d');
+  const video      = document.getElementById('video');
+  const canvas     = document.getElementById('canvas');
+  const ctx        = canvas.getContext('2d');
   const statusDot  = document.getElementById('status-dot');
   const statusText = document.getElementById('status-text');
+  const slider     = document.getElementById('interval-slider');
+  const intervalEl = document.getElementById('interval-val');
 
+  let intervalMs = 8000;
+  let scanTimer  = null;
+
+  // ── Interval slider ──
+  slider.addEventListener('input', () => {
+    intervalMs = parseInt(slider.value) * 1000;
+    intervalEl.textContent = slider.value + 's';
+    statusText.textContent = `Camera active — scanning every ${slider.value}s`;
+  });
+
+  // ── Camera ──
   async function startCamera() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
       video.srcObject = stream;
-      statusText.textContent = 'Camera active — scanning every 3s';
       return true;
     } catch (e) {
       showError('Camera access denied: ' + e.message);
@@ -267,25 +290,24 @@
     canvas.width  = video.videoWidth  || 640;
     canvas.height = video.videoHeight || 480;
     ctx.drawImage(video, 0, 0);
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-    return dataUrl.split(',')[1]; // strip "data:image/jpeg;base64,"
+    return canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+  }
+
+  // ── UI update ──
+  function updateWeather(w, ffwi, risk) {
+    document.getElementById('w-temp').textContent  = w.temperature_f;
+    document.getElementById('w-hum').textContent   = w.humidity_pct;
+    document.getElementById('w-wind').textContent  = w.wind_mph;
+    document.getElementById('ffwi-score').textContent = ffwi.toFixed(1);
+    const riskEl = document.getElementById('risk-level');
+    riskEl.textContent = risk;
+    riskEl.className = 'risk-' + risk;
   }
 
   function updateUI(data) {
-    // FFWI badge
-    const score = document.getElementById('ffwi-score');
-    const riskEl = document.getElementById('risk-level');
-    score.textContent = data.ffwi_score.toFixed(1);
-    riskEl.textContent = data.risk_level;
-    riskEl.className = 'risk-' + data.risk_level;
-
-    // Weather strip
-    document.getElementById('w-temp').textContent  = data.weather.temperature_f;
-    document.getElementById('w-hum').textContent   = data.weather.humidity_pct;
-    document.getElementById('w-wind').textContent  = data.weather.wind_mph;
+    updateWeather(data.weather, data.ffwi_score, data.risk_level);
     document.getElementById('w-score').textContent = data.overall_score;
 
-    // Hazard list
     const list = document.getElementById('hazard-list');
     if (!data.hazards || data.hazards.length === 0) {
       list.innerHTML = '<div class="no-hazards">✅ No hazards detected in this frame.</div>';
@@ -301,8 +323,6 @@
         </div>
       `).join('');
     }
-
-    // JSON drawer
     document.getElementById('json-out').textContent = JSON.stringify(data, null, 2);
   }
 
@@ -313,33 +333,25 @@
     setTimeout(() => { toast.style.display = 'none'; }, 4000);
   }
 
-  // Fetch weather independently so it displays even if vision analysis fails.
+  // ── Weather fetch (independent — shows data even if vision fails) ──
   async function fetchWeather() {
     try {
       const resp = await fetch(`${API_BASE}/weather?lat=${GPS.lat}&lon=${GPS.lon}`);
       if (!resp.ok) return;
       const w = await resp.json();
-      document.getElementById('w-temp').textContent  = w.temperature_f;
-      document.getElementById('w-hum').textContent   = w.humidity_pct;
-      document.getElementById('w-wind').textContent  = w.wind_mph;
-      document.getElementById('ffwi-score').textContent = w.ffwi_score.toFixed(1);
-      const riskEl = document.getElementById('risk-level');
-      riskEl.textContent = w.risk_level;
-      riskEl.className = 'risk-' + w.risk_level;
-    } catch (_) {
-      // non-critical — weather strip stays at last known value
-    }
+      updateWeather(w, w.ffwi_score, w.risk_level);
+    } catch (_) {}
   }
 
+  // ── Scan loop using setTimeout so interval is dynamically adjustable ──
   async function scanFrame() {
     statusDot.classList.add('scanning');
     statusText.textContent = 'Analyzing…';
 
-    // Always update weather first — if vision fails below, the strip still shows current data.
-    await fetchWeather();
+    await fetchWeather(); // always show weather even if vision fails
 
     try {
-      const b64 = captureFrame();
+      const b64  = captureFrame();
       const resp = await fetch(`${API_BASE}/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -348,8 +360,6 @@
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
       updateUI(data);
-
-      // Also add to session report
       fetch(`${API_BASE}/report/add`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -359,17 +369,18 @@
       showError('Analysis failed: ' + e.message);
     } finally {
       statusDot.classList.remove('scanning');
-      statusText.textContent = 'Camera active — scanning every 3s';
+      statusText.textContent = `Camera active — scanning every ${slider.value}s`;
+      scanTimer = setTimeout(scanFrame, intervalMs);
     }
   }
 
+  // ── Boot ──
   (async () => {
     const ok = await startCamera();
     if (ok) {
-      // Wait for video to be ready before first scan
       video.addEventListener('loadeddata', () => {
+        statusText.textContent = `Camera active — scanning every ${slider.value}s`;
         scanFrame();
-        setInterval(scanFrame, INTERVAL_MS);
       }, { once: true });
     }
   })();

@@ -1,27 +1,24 @@
 import os
 import math
-import base64
 import json
 import logging
+import traceback
 from datetime import datetime, timezone
-from typing import Optional
-from collections import defaultdict
 
 import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
-from openai import OpenAI
+from groq import Groq
 
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
-XAI_API_KEY = os.getenv("XAI_API_KEY", "")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 app = FastAPI(title="Wildfire Defensible Space Hazard Detector", version="1.0.0")
 
@@ -33,7 +30,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# In-memory session report store
 _session_hazards: list[dict] = []
 
 
@@ -53,11 +49,10 @@ class ReportAddRequest(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Issue #2 — Fosberg Fire Weather Index
+# Fosberg Fire Weather Index
 # ---------------------------------------------------------------------------
 
 def _moisture_content(h: float, T: float) -> float:
-    """Equilibrium moisture content from humidity h (%) and temperature T (°F)."""
     if h < 10:
         return 0.03229 + 0.281073 * h - 0.000578 * h * T
     elif h <= 50:
@@ -67,7 +62,6 @@ def _moisture_content(h: float, T: float) -> float:
 
 
 def calculate_ffwi(temperature_f: float, humidity_pct: float, wind_mph: float) -> tuple[float, str]:
-    """Return (ffwi_score, risk_level)."""
     m = _moisture_content(humidity_pct, temperature_f)
     ratio = m / 30.0
     n = 1 - 2 * ratio + 1.5 * ratio ** 2 - 0.5 * ratio ** 3
@@ -86,11 +80,10 @@ def calculate_ffwi(temperature_f: float, humidity_pct: float, wind_mph: float) -
 
 
 # ---------------------------------------------------------------------------
-# Issue #3 — OpenWeatherMap weather fetch
+# OpenWeatherMap
 # ---------------------------------------------------------------------------
 
 async def fetch_weather(lat: float, lon: float) -> dict:
-    """Fetch current weather from OpenWeatherMap; return temp_f, humidity_pct, wind_mph."""
     url = (
         f"https://api.openweathermap.org/data/2.5/weather"
         f"?lat={lat}&lon={lon}&appid={OPENWEATHER_API_KEY}&units=imperial"
@@ -108,7 +101,7 @@ async def fetch_weather(lat: float, lon: float) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Issue #4 — Grok Vision + Gemini fallback hazard detection
+# Groq LLaMA Vision hazard detection
 # ---------------------------------------------------------------------------
 
 _HAZARD_PROMPT = """You are a CAL FIRE defensible space expert. Analyze the image and identify all wildfire hazards.
@@ -130,9 +123,10 @@ Example:
   }
 ]"""
 
+_GROQ_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
+
 
 def _parse_hazards(text: str) -> list[dict]:
-    """Extract JSON array from model response text."""
     text = text.strip()
     start = text.find("[")
     end = text.rfind("]")
@@ -144,66 +138,33 @@ def _parse_hazards(text: str) -> list[dict]:
         return []
 
 
-async def detect_hazards_gemini(image_base64: str) -> list[dict]:
-    """Primary: use Gemini Vision to detect hazards. Raises on failure."""
-    from google import genai
-    from google.genai import types
-
-    client = genai.Client(api_key=GEMINI_API_KEY)
-    image_bytes = base64.b64decode(image_base64)
-    response = client.models.generate_content(
-        model="gemini-2.0-flash",
-        contents=[
-            types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
-            _HAZARD_PROMPT,
-        ],
-    )
-    return _parse_hazards(response.text)
-
-
-async def detect_hazards_grok(image_base64: str) -> list[dict]:
-    """Fallback: use Grok Vision to detect hazards. Raises on failure."""
-    client = OpenAI(api_key=XAI_API_KEY, base_url="https://api.x.ai/v1")
-    response = client.chat.completions.create(
-        model="grok-2-vision-latest",
-        messages=[
-            {
+async def detect_hazards(image_base64: str) -> tuple[list[dict], str]:
+    try:
+        client = Groq(api_key=GROQ_API_KEY)
+        response = client.chat.completions.create(
+            model=_GROQ_MODEL,
+            messages=[{
                 "role": "user",
                 "content": [
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"},
-                    },
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}},
                     {"type": "text", "text": _HAZARD_PROMPT},
                 ],
-            }
-        ],
-        max_tokens=1024,
-    )
-    return _parse_hazards(response.choices[0].message.content)
-
-
-async def detect_hazards(image_base64: str) -> tuple[list[dict], str]:
-    """Try Gemini first, fall back to Grok. Returns (hazards, model_used)."""
-    try:
-        hazards = await detect_hazards_gemini(image_base64)
-        log.info("Hazard detection via Gemini Vision succeeded")
-        return hazards, "gemini-2.0-flash"
+            }],
+            max_tokens=1024,
+        )
+        hazards = _parse_hazards(response.choices[0].message.content)
+        log.info("Hazard detection via Groq LLaMA Vision succeeded")
+        return hazards, _GROQ_MODEL
     except Exception:
-        import traceback
-        log.warning("Gemini Vision failed — full traceback:\n%s", traceback.format_exc())
-
-    hazards = await detect_hazards_grok(image_base64)
-    log.info("Hazard detection via Grok Vision (fallback) succeeded")
-    return hazards, "grok-2-vision-latest"
+        log.error("Groq Vision failed — full traceback:\n%s", traceback.format_exc())
+        raise
 
 
 # ---------------------------------------------------------------------------
-# Issue #5 — Urgency classification
+# Urgency classification
 # ---------------------------------------------------------------------------
 
 _URGENCY_MATRIX = {
-    # (risk_level, severity) -> urgency label
     ("Extreme", "severe"): "MUST",
     ("Extreme", "moderate"): "MUST",
     ("Extreme", "minor"): "SHOULD",
@@ -237,21 +198,20 @@ def classify_hazards(hazards: list[dict], risk_level: str) -> list[dict]:
 
 
 def overall_score(risk_level: str, hazards: list[dict]) -> int:
-    """1-5 composite risk score."""
     base = {"Low": 1, "Moderate": 2, "High": 3, "Extreme": 4}[risk_level]
     must_count = sum(1 for h in hazards if h["urgency"] == "MUST")
     return min(5, base + (1 if must_count > 0 else 0))
 
 
 # ---------------------------------------------------------------------------
-# Terminal pretty-print helper
+# Terminal pretty-print
 # ---------------------------------------------------------------------------
 
 _RISK_COLORS = {
-    "Low": "\033[92m",       # green
-    "Moderate": "\033[93m",  # yellow
-    "High": "\033[91m",      # red
-    "Extreme": "\033[95m",   # magenta
+    "Low": "\033[92m",
+    "Moderate": "\033[93m",
+    "High": "\033[91m",
+    "Extreme": "\033[95m",
 }
 _RESET = "\033[0m"
 _BOLD = "\033[1m"
@@ -315,24 +275,24 @@ async def startup_checks() -> None:
     except Exception as exc:
         print(f"  \033[91m[FAIL]\033[0m OpenWeatherMap — {exc}")
 
-    # 2. Gemini API (text-only ping, no image needed)
+    # 2. Groq API (text-only ping)
     try:
-        from google import genai
-
-        client = genai.Client(api_key=GEMINI_API_KEY)
-        resp = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents="Reply with exactly one word: OK",
+        client = Groq(api_key=GROQ_API_KEY)
+        resp = client.chat.completions.create(
+            model=_GROQ_MODEL,
+            messages=[{"role": "user", "content": "Reply with exactly one word: OK"}],
+            max_tokens=10,
         )
-        print(f"  \033[92m[PASS]\033[0m Gemini API — response: {resp.text.strip()[:80]}")
+        answer = resp.choices[0].message.content.strip()[:80]
+        print(f"  \033[92m[PASS]\033[0m Groq API ({_GROQ_MODEL}) — response: {answer}")
     except Exception as exc:
-        print(f"  \033[91m[FAIL]\033[0m Gemini API — {exc}")
+        print(f"  \033[91m[FAIL]\033[0m Groq API — {exc}")
 
     print("=" * 60 + "\n")
 
 
 # ---------------------------------------------------------------------------
-# Issue #6 — API endpoints
+# API endpoints
 # ---------------------------------------------------------------------------
 
 @app.get("/health")
@@ -354,24 +314,20 @@ async def weather_endpoint(lat: float, lon: float):
 
 @app.post("/analyze")
 async def analyze(req: AnalyzeRequest):
-    # 1. Fetch weather
     try:
         weather = await fetch_weather(req.lat, req.lon)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Weather fetch failed: {exc}")
 
-    # 2. FFWI
     ffwi_score, risk_level = calculate_ffwi(
         weather["temperature_f"], weather["humidity_pct"], weather["wind_mph"]
     )
 
-    # 3. Vision hazard detection
     try:
         raw_hazards, model_used = await detect_hazards(req.image_base64)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Vision analysis failed: {exc}")
 
-    # 4. Classify + score
     hazards = classify_hazards(raw_hazards, risk_level)
     score = overall_score(risk_level, hazards)
 
@@ -400,7 +356,6 @@ async def report_summary():
     if not _session_hazards:
         return {"frames_analyzed": 0, "hazards": [], "highest_risk": None}
 
-    # Deduplicate hazards by name, keeping highest urgency
     best: dict[str, dict] = {}
     for frame in _session_hazards:
         for h in frame.get("hazards", []):
@@ -413,7 +368,6 @@ async def report_summary():
     risk_levels = [f.get("risk_level", "Low") for f in _session_hazards]
     risk_rank = {"Low": 0, "Moderate": 1, "High": 2, "Extreme": 3}
     highest_risk = max(risk_levels, key=lambda r: risk_rank[r])
-
     avg_ffwi = round(
         sum(f.get("ffwi_score", 0) for f in _session_hazards) / len(_session_hazards), 2
     )

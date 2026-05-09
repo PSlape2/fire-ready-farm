@@ -356,6 +356,12 @@ async def analyze(req: AnalyzeRequest):
     return result
 
 
+@app.delete("/report")
+async def report_reset():
+    _session_hazards.clear()
+    return {"status": "reset"}
+
+
 @app.post("/report/add")
 async def report_add(req: ReportAddRequest):
     _session_hazards.append(req.analysis)

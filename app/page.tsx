@@ -83,13 +83,16 @@ export default function Home() {
             How It Works
           </h2>
           <p className="text-center mb-14" style={{ color: "var(--clay)" }}>
-            Three steps to wildfire preparedness
+            Six steps to wildfire preparedness
           </p>
           <div className="grid md:grid-cols-3 gap-8">
             {[
-              { icon: "📍", step: "01", title: "Enter Your Property", desc: "Tell us your location, property type, and size. Upload an aerial photo for enhanced analysis." },
-              { icon: "🤖", step: "02", title: "AI Risk Analysis", desc: "Our model evaluates vegetation, topography, wind patterns, drought index, and proximity to past fires." },
-              { icon: "📋", step: "03", title: "Get Your Action Plan", desc: "Receive a wildfire risk score and a prioritized checklist of protective measures tailored to your farm." },
+              { icon: "📍", step: "01", title: "Enter Your Property", desc: "Tell us your location, property type, and acreage so we can pull the right regional data for your land." },
+              { icon: "📸", step: "02", title: "Upload Site Photos", desc: "Add aerial or ground-level photos of your property. Our vision model scans for vegetation density, dry brush, and structural hazards." },
+              { icon: "🌦️", step: "03", title: "Fetch Live Conditions", desc: "We pull real-time weather, wind speed, drought index, and humidity from weather APIs to reflect current fire weather conditions." },
+              { icon: "🤖", step: "04", title: "AI Risk Analysis", desc: "Our model cross-references your site data with proximity to past fires, defensible space, and fuel load to compute a risk score." },
+              { icon: "📊", step: "05", title: "Review Your Risk Score", desc: "See your overall risk rating broken down by category — vegetation, structure, access, and weather — with a clear explanation of each factor." },
+              { icon: "📋", step: "06", title: "Get Your Action Plan", desc: "Receive a prioritized checklist of protective measures and download a PDF report ready to share with insurers or emergency services." },
             ].map((item) => (
               <div key={item.step} className="relative p-6 rounded-2xl" style={{ background: "var(--parchment)", border: "1px solid #E7E5E4" }}>
                 <span className="absolute top-4 right-4 text-xs font-bold tracking-widest" style={{ color: "#D6D3D1" }}>{item.step}</span>

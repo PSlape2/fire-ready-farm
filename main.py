@@ -94,9 +94,9 @@ async def fetch_weather(lat: float, lon: float) -> dict:
         data = resp.json()
 
     return {
-        "temperature_f": round(data["main"]["temp"], 1),
-        "humidity_pct": data["main"]["humidity"],
-        "wind_mph": round(data["wind"]["speed"], 1),
+        "temperature_f": round(data["current"]["temperature_2m"], 1),
+        "humidity_pct": data["current"]["relative_humidity_2m"],
+        "wind_mph": round(data["current"]["wind_speed_10m"], 1),
     }
 
 

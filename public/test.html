@@ -346,7 +346,7 @@
 <div id="error-toast"></div>
 
 <script>
-  const API_BASE   = 'https://embark-pretty-stuck.ngrok-free.dev';
+  const API_BASE   = '';
   const GPS        = { lat: 32.8801, lon: -117.2340 };
 
   const video      = document.getElementById('video');
@@ -383,7 +383,7 @@
 
   document.getElementById('modal-exit').addEventListener('click', async () => {
     try {
-      const resp = await fetch(`${API_BASE}/report/summary`);
+      const resp = await fetch(`${API_BASE}/api/proxy/report/summary`);
       if (resp.ok) {
         const summary = await resp.json();
         localStorage.setItem('wildfireScanSummary', JSON.stringify(summary));
@@ -457,7 +457,7 @@
   // ── Weather fetch (independent — shows data even if vision fails) ──
   async function fetchWeather() {
     try {
-      const resp = await fetch(`${API_BASE}/weather?lat=${GPS.lat}&lon=${GPS.lon}`);
+      const resp = await fetch(`${API_BASE}/api/proxy/weather?lat=${GPS.lat}&lon=${GPS.lon}`);
       if (!resp.ok) return;
       const w = await resp.json();
       updateWeather(w, w.ffwi_score, w.risk_level);
@@ -473,7 +473,7 @@
 
     try {
       const b64  = captureFrame();
-      const resp = await fetch(`${API_BASE}/analyze`, {
+      const resp = await fetch(`${API_BASE}/api/proxy/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image_base64: b64, lat: GPS.lat, lon: GPS.lon }),
@@ -481,7 +481,7 @@
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
       updateUI(data);
-      fetch(`${API_BASE}/report/add`, {
+      fetch(`${API_BASE}/api/proxy/report/add`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ analysis: data }),

@@ -11,11 +11,10 @@ import type { ImageFinding, ModelDebugInfo } from "../../lib/scoring";
 // ---------------------------------------------------------------------------
 
 const PROPERTY_FACTORS = [
-  { id: "vegetation", icon: "🌿", label: "Vegetation Type",      weight: 20 },
-  { id: "water",      icon: "💧", label: "Water Availability",   weight: 15 },
+  { id: "vegetation", icon: "🌿", label: "Vegetation Type",      weight: 25 },
+  { id: "water",      icon: "💧", label: "Water Availability",   weight: 20 },
   { id: "firebreak",  icon: "🛡️", label: "Defensible Space",     weight: 15 },
   { id: "proximity",  icon: "🗺️", label: "Fire History (Area)",  weight: 10 },
-  { id: "slope",      icon: "⛰️", label: "Terrain & Slope",      weight: 10 },
 ];
 
 const CHECKLISTS: Record<string, string[]> = {
@@ -120,9 +119,12 @@ function getPropertyFactorScore(factorId: string, params: URLSearchParams): numb
       if (f === "yes-partial") return 55;
       return 15;
     }
-    case "proximity": return 55;
-    case "slope":     return 42;
-    default:          return 50;
+    case "proximity": {
+      const fireHistoryCount = parseInt(params.get("fireHistoryCount") || "0");
+      // Higher risk if there's significant fire history in the area
+      return Math.min(100, Math.max(0, fireHistoryCount * 6));
+    }
+    default: return 50;
   }
 }
 
@@ -138,6 +140,22 @@ function getRiskMeta(score: number) {
       gradFrom: "#78350F", gradTo: "#D97706" };
   return { label: "Low Risk", tier: "low" as const, color: "#16A34A", bg: "#F0FDF4",
     gradFrom: "#14532D", gradTo: "#16A34A" };
+}
+
+function getTaskProgressColor(score: number) {
+  if (score < 0.25) return "#990000";
+  if (score < 0.5)  return "#CC3300";
+  if (score < 0.75) return "#FF6600";
+  if (score < 1)    return "#FFCC00";
+                    return "#669900";
+}
+
+function getTaskPercentColor(score: number) {
+  if (score < 0.25) return "#990000";
+  if (score < 0.5)  return "#CC3300";
+  if (score < 0.75) return "#FF6600";
+  if (score < 1)    return "#a08001ff";
+                    return "#669900";
 }
 
 // ---------------------------------------------------------------------------
@@ -566,11 +584,11 @@ function ChecklistSection({ items, riskColor }: { items: string[]; riskColor: st
         <span className="text-sm font-medium" style={{ color: "var(--clay)" }}>
           {checked.size} / {items.length} completed
         </span>
-        <span className="text-sm font-bold" style={{ color: riskColor }}>{pct}%</span>
+        <span className="text-sm font-bold" style={{ color: getTaskPercentColor(checked.size / items.length) }}>{pct}%</span>
       </div>
       <div className="w-full h-2 rounded-full mb-5" style={{ background: "#E7E5E4" }}>
         <div className="h-2 rounded-full transition-all duration-500"
-          style={{ width: `${pct}%`, background: riskColor }} />
+          style={{ width: `${pct}%`, background: getTaskProgressColor(checked.size / items.length) }} />
       </div>
       <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid #E7E5E4" }}>
         {items.map((item, i) => (

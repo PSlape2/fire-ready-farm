@@ -196,6 +196,49 @@ export default function AssessPage() {
       structureCount: form.structureCount,
     });
 
+    // Geocode location and get fire history
+    try {
+      setLoadingMsg("Getting location coordinates...");
+      const geocodeRes = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(form.location)}&limit=1`
+      );
+      const geocodeData = await geocodeRes.json();
+      
+      if (geocodeData && geocodeData.length > 0) {
+        const { lat, lon } = geocodeData[0];
+        const latNum = parseFloat(lat);
+        const lonNum = parseFloat(lon);
+        params.set("latitude", lat);
+        params.set("longitude", lon);
+
+        setLoadingMsg("Checking fire history...");
+        // Search for fire history within ~100km range (approximately 1 degree lat/lon)
+        const latRange = 0.5; // ~50km radius
+        const lonRange = 0.5; // ~50km radius
+
+        let latMin = Math.round(latNum - latRange);
+        let latMax = Math.round(latNum + latRange);
+        let lonMin = Math.round(lonNum - lonRange);
+        let lonMax = Math.round(lonNum + lonRange);
+
+        if(latMin === latMax) latMax += 1;
+        if(lonMin === lonMax) lonMax += 1;
+        
+        const fireHistoryRes = await fetch(
+          `/api/fire-history?dataTypeId=12&minLat=${latMin}&maxLat=${latMax}&minLon=${lonMin}&maxLon=${lonMax}&headersOnly=true&limit=20&earliestYear=2016&timeFormat=BP&timeMethod=entireOver`
+        );
+        
+        if (fireHistoryRes.ok) {
+          const fireHistoryData = await fireHistoryRes.json();
+          params.set("fireHistoryCount", String(fireHistoryData.count || 0));
+          // params.set("fireHistoryData", JSON.stringify(fireHistoryData.data || {}));
+        }
+      }
+    } catch (error) {
+      console.error("Error getting fire history:", error);
+      // proceed without fire history
+    }
+
     if (form.image) {
       setLoadingMsg("Analyzing property image...");
       try {

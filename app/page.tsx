@@ -132,7 +132,7 @@ export default function Home() {
           <span className="flicker">🔥</span>
           <span className="font-display font-semibold" style={{ color: "var(--smoke)" }}>FireReadyFarm</span>
         </div>
-        <span>Built for the 2025 AgriTech Hackathon · Mock data only</span>
+        <span>Built for the 2026 UCSD Reboot the Earth Hackathon · Mock data only</span>
       </footer>
     </main>
   );

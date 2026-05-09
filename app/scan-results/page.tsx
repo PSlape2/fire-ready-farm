@@ -19,6 +19,13 @@ interface ScanSummary {
   highest_risk: string | null;
   average_ffwi: number;
   hazards: SummaryHazard[];
+  resolvedHazards?: string[];
+  scanDate?: string;
+  location?: string;
+}
+
+function hazardId(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
 // ---------------------------------------------------------------------------
@@ -49,8 +56,12 @@ function getRisk(level: string | null) {
 // Hazard card
 // ---------------------------------------------------------------------------
 
-function HazardCard({ hazard, index }: { hazard: SummaryHazard; index: number }) {
-  const [checked, setChecked] = useState(false);
+function HazardCard({ hazard, index, initialChecked = false }: {
+  hazard: SummaryHazard;
+  index: number;
+  initialChecked?: boolean;
+}) {
+  const [checked, setChecked] = useState(initialChecked);
   const s = URGENCY_STYLE[hazard.urgency] ?? URGENCY_STYLE.MAY;
   return (
     <button
@@ -132,10 +143,46 @@ export default function ScanResultsPage() {
   const mustCount   = summary?.hazards.filter((h) => h.urgency === "MUST").length   ?? 0;
   const shouldCount = summary?.hazards.filter((h) => h.urgency === "SHOULD").length ?? 0;
 
+  const scanDateStr = summary?.scanDate
+    ? new Date(summary.scanDate).toLocaleString()
+    : new Date().toLocaleString();
+
   return (
+    <>
+    <style>{`
+      @media print {
+        @page { size: A4 portrait; margin: 2cm; }
+        body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .no-print { display: none !important; }
+        .print-only { display: block !important; }
+        nav { display: none !important; }
+        button { display: none !important; }
+        a[href] { display: none !important; }
+        main { min-height: auto !important; background: white !important; }
+      }
+      .print-only { display: none; }
+    `}</style>
+
+    {/* Print-only report header */}
+    <div className="print-only" style={{ marginBottom: "24px", borderBottom: "2px solid #333", paddingBottom: "16px" }}>
+      <h1 style={{ fontSize: "22px", fontWeight: "bold", marginBottom: "6px" }}>
+        🔥 FireReadyFarm — Wildfire Risk Assessment Report
+      </h1>
+      {summary && (
+        <div style={{ fontSize: "13px", color: "#444", lineHeight: "1.8" }}>
+          <div>Generated: {scanDateStr}</div>
+          {summary.location && <div>Location: {summary.location}</div>}
+          <div>Risk Level: <strong>{summary.highest_risk || "Low"}</strong> · Avg FFWI: <strong>{summary.average_ffwi}</strong> · Frames Analyzed: <strong>{summary.frames_analyzed}</strong></div>
+          {summary.hazards.length > 0 && (
+            <div>Resolved during scan: <strong>{summary.resolvedHazards?.length ?? 0} / {summary.hazards.length}</strong></div>
+          )}
+        </div>
+      )}
+    </div>
+
     <main className="min-h-screen" style={{ background: "var(--parchment)" }}>
       {/* Nav */}
-      <nav className="flex items-center justify-between px-8 py-5 border-b border-stone-200 bg-white">
+      <nav className="no-print flex items-center justify-between px-8 py-5 border-b border-stone-200 bg-white">
         <Link href="/" className="flex items-center gap-2">
           <span className="text-2xl flicker">🔥</span>
           <span className="font-display text-xl font-semibold" style={{ color: "var(--smoke)" }}>
@@ -256,7 +303,12 @@ export default function ScanResultsPage() {
 
               <div className="space-y-3">
                 {summary.hazards.map((h, i) => (
-                  <HazardCard key={`${h.name}-${i}`} hazard={h} index={i} />
+                  <HazardCard
+                    key={`${h.name}-${i}`}
+                    hazard={h}
+                    index={i}
+                    initialChecked={summary.resolvedHazards?.includes(hazardId(h.name)) ?? false}
+                  />
                 ))}
               </div>
             </div>
@@ -273,9 +325,19 @@ export default function ScanResultsPage() {
             </div>
           )}
 
+          {/* PDF download */}
+          <div className="no-print flex justify-end mb-4">
+            <button
+              onClick={() => window.print()}
+              className="flex items-center gap-2 px-5 py-2 rounded-full text-sm font-semibold transition-all hover:opacity-90"
+              style={{ background: "#1C1917", color: "#A8A29E", border: "1px solid #44403C" }}>
+              📄 Download PDF Report
+            </button>
+          </div>
+
           {/* CTA footer */}
           <div
-            className="rounded-2xl p-6 text-center"
+            className="no-print rounded-2xl p-6 text-center"
             style={{ background: "linear-gradient(135deg, var(--smoke), var(--ash))" }}>
             <p className="font-display text-xl text-white font-semibold mb-1">Ready for another look?</p>
             <p className="text-sm text-stone-400 mb-5">
@@ -300,5 +362,6 @@ export default function ScanResultsPage() {
         </div>
       )}
     </main>
+    </>
   );
 }

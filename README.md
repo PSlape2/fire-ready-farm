@@ -1,176 +1,85 @@
-# Wildfire Defensible Space Hazard Detector
+# FireReadyFarm — Wildfire Risk Assessment
 
-Real-time wildfire hazard detection using Groq LLaMA Vision and live weather data.
-Analyzes camera frames against CAL FIRE defensible space standards and calculates
-the Fosberg Fire Weather Index (FFWI) to prioritize which hazards to remove first.
+Real-time wildfire hazard detection and property risk assessment, built for the 2026 DataHacks Hackathon.
 
----
+## What is this
 
-## How it works
+FireReadyFarm offers two modes of wildfire risk analysis:
+- **Quick Assessment** — fill out a short form, optionally upload a photo, and get a property risk report with an action checklist
+- **Live Deep Scan** — point your phone camera at your surroundings for real-time AI hazard detection, live weather data, and a Fosberg Fire Weather Index (FFWI) score
 
-1. Browser sends a camera frame + GPS coordinates every N seconds (adjustable)
-2. Backend fetches live weather from OpenWeatherMap (temperature, humidity, wind)
-3. FFWI is calculated to determine current fire weather risk
-4. Groq LLaMA Vision analyzes the image for CAL FIRE defensible space hazards
-5. Each hazard is classified as **MUST / SHOULD / COULD / MAY** remove based on
-   risk level × hazard severity
+## Tech Stack
 
----
+- **Backend**: FastAPI, Groq LLaMA Vision (meta-llama/llama-4-scout-17b-16e-instruct), OpenWeatherMap API
+- **Frontend**: Next.js 15, Tailwind CSS
+- **Mobile access**: ngrok
 
-## Requirements
+## API Keys Required
 
-- Python 3.11+
-- A Groq API key (free at [console.groq.com](https://console.groq.com))
-- An OpenWeatherMap API key (free at [openweathermap.org](https://home.openweathermap.org/api_keys))
+| Key | Purpose | Free sign-up |
+|-----|---------|--------------|
+| `GROQ_API_KEY` | LLaMA Vision hazard detection in the FastAPI backend | [console.groq.com](https://console.groq.com/keys) |
+| `OPENWEATHER_API_KEY` | Live weather data (temp, humidity, wind) in the FastAPI backend | [openweathermap.org](https://home.openweathermap.org/api_keys) |
+| ngrok authtoken | Expose local server to your phone over HTTPS (not in .env — see step 4) | [dashboard.ngrok.com](https://dashboard.ngrok.com/get-started/your-authtoken) |
 
----
+> **No key needed:** Open-Meteo (frontend weather route) and the local BLIP/CLIP vision models (frontend image analysis) are fully free with no account required.
 
 ## Setup
 
-```bash
-# 1. Clone the repository
+**1. Clone and switch to the right branch**
+```
 git clone https://github.com/raw012/WildFireDangerChecker.git
 cd WildFireDangerChecker
+git checkout shallow_deep
+```
 
-# 2. Create a virtual environment
+**2. Set up Python backend**
+```
 python -m venv .venv
-source .venv/bin/activate      # Windows: .venv\Scripts\activate
-
-# 3. Install dependencies
+source .venv/bin/activate
 pip install -r requirements.txt
-
-# 4. Add your API keys
 cp .env.example .env
-# Open .env and fill in GROQ_API_KEY and OPENWEATHER_API_KEY
+```
+Fill in all API keys in `.env`
 
-# 5. Start the server
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+**3. Install frontend dependencies**
+```
+npm install
 ```
 
-On startup, the server automatically runs two checks and prints **PASS / FAIL**
-for each:
-- OpenWeatherMap live weather fetch (UCSD coordinates)
-- Groq API text ping
+**4. Run (3 terminals)**
 
----
-
-## Test UI
-
-Open `test.html` directly in your browser — no web server needed.
-
-- Requests camera access and captures a frame on the configured interval
-- Use the **Interval slider** (5 s – 30 s, default 8 s) in the top bar to adjust
-  how often frames are sent without editing any code
-- FFWI score and risk level are pinned to the top-right corner at all times
-- Weather data is fetched independently so it displays even if vision analysis fails
-
----
-
-## API Reference
-
-### `POST /analyze`
-
-Analyze a single camera frame.
-
-**Request**
-```json
-{
-  "image_base64": "<base64 JPEG string>",
-  "lat": 32.8801,
-  "lon": -117.2340
-}
+Terminal 1 — Backend:
+```
+.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
-**Response**
-```json
-{
-  "ffwi_score": 34.2,
-  "risk_level": "High",
-  "weather": {
-    "temperature_f": 85,
-    "humidity_pct": 22,
-    "wind_mph": 15
-  },
-  "hazards": [
-    {
-      "name": "Dead vegetation near structure",
-      "location_in_image": "bottom left",
-      "urgency": "MUST",
-      "action": "Remove immediately — dry fuel within 30ft of structure"
-    }
-  ],
-  "overall_score": 4,
-  "model_used": "meta-llama/llama-4-scout-17b-16e-instruct",
-  "timestamp": "2026-05-08T20:00:00Z"
-}
+Terminal 2 — Frontend:
+```
+npm run dev
 ```
 
----
-
-### `GET /weather?lat=&lon=`
-
-Returns current weather + FFWI for any coordinates without requiring an image.
-
----
-
-### `POST /report/add`
-
-Add a completed analysis frame to the session report.
-
-```json
-{ "analysis": { /* /analyze response */ } }
+Terminal 3 — Mobile access (optional):
 ```
-
----
-
-### `GET /report/summary`
-
-Deduplicated, prioritized summary across all frames analyzed in this session.
-
-```json
-{
-  "frames_analyzed": 12,
-  "highest_risk": "High",
-  "average_ffwi": 31.4,
-  "hazards": [ ... ]
-}
+ngrok config add-authtoken <your_ngrok_authtoken>
+ngrok http 3000
 ```
+Open the `https://xxxx.ngrok-free.app` URL on your phone.
 
----
+## Using on Mobile
 
-### `GET /health`
-
-```json
-{ "status": "ok", "timestamp": "..." }
-```
-
----
+Open the ngrok URL in Safari on your iPhone. Landscape mode recommended for the Live Deep Scan interface. Tap **Live Deep Scan**, allow camera access, and point your phone at the area you want to assess. Results update automatically every 8 seconds.
 
 ## FFWI Formula
+
+The Fosberg Fire Weather Index measures fire weather risk from temperature, humidity, and wind:
 
 ```
 For h < 10%:       m = 0.03229 + 0.281073h − 0.000578hT
 For 10% < h ≤ 50%: m = 2.22749 + 0.160107h − 0.01478T
 For h > 50%:       m = 21.0606 + 0.005565h² − 0.00035hT − 0.483199h
-
 n    = 1 − 2(m/30) + 1.5(m/30)² − 0.5(m/30)³
 FFWI = n × √(1 + U²) / 0.3002
-
-T = temperature (°F)   h = relative humidity (%)   U = wind speed (mph)
 ```
 
-| FFWI     | Risk Level |
-|----------|------------|
-| < 10     | Low        |
-| 10 – 25  | Moderate   |
-| 25 – 50  | High       |
-| > 50     | Extreme    |
-
-## Urgency Matrix
-
-| FFWI Risk + Hazard Severity      | Action      |
-|----------------------------------|-------------|
-| Extreme or High + severe         | MUST remove |
-| High or Moderate + moderate      | SHOULD remove |
-| Moderate + minor                 | COULD remove |
-| Low + any minor                  | MAY consider |
+FFWI < 10 = Low · 10–25 = Moderate · 25–50 = High · > 50 = Extreme

@@ -18,7 +18,6 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 log = logging.getLogger(__name__)
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "")
 
 app = FastAPI(title="Wildfire Defensible Space Hazard Detector", version="1.0.0")
 
@@ -85,8 +84,9 @@ def calculate_ffwi(temperature_f: float, humidity_pct: float, wind_mph: float) -
 
 async def fetch_weather(lat: float, lon: float) -> dict:
     url = (
-        f"https://api.openweathermap.org/data/2.5/weather"
-        f"?lat={lat}&lon={lon}&appid={OPENWEATHER_API_KEY}&units=imperial"
+        f'https://api.open-meteo.com/v1/forecast'
+        f'?latitude={lat}&longitude={lon}&current='
+        f'temperature_2m,wind_speed_10m,relative_humidity_2m'
     )
     async with httpx.AsyncClient(timeout=10) as client:
         resp = await client.get(url)
@@ -104,29 +104,43 @@ async def fetch_weather(lat: float, lon: float) -> dict:
 # Groq LLaMA Vision hazard detection
 # ---------------------------------------------------------------------------
 
-_HAZARD_PROMPT = """You are a CAL FIRE defensible space expert analyzing an image for wildfire hazards.
+_HAZARD_PROMPT = """You are a CAL FIRE defensible space expert and fire hazard recognition assistant analyzing an image for wildfire hazards.
+Only report hazards that are clearly visible and genuinely dangerous fire risks. Do NOT report speculative, minor, or uncertain hazards. If the scene is safe with no hazards, return an empty array [] — do not invent hazards. An empty array is a valid and preferred response for safe scenes. If you are not confident a hazard exists, do not include it.
+When analyzing the image, look for hazards across these three categories:
 
-Only report hazards that are clearly visible and genuinely dangerous fire risks.
-Do NOT report speculative, minor, or uncertain hazards.
-If the scene is safe with no hazards, return an empty array [] — do not invent hazards.
-An empty array is a valid and preferred response for safe scenes.
-If you are not confident a hazard exists, do not include it.
+FUELS: Hay, straw, or bedding material such as sawdust or shredded newspaper. Dry or brown grass, dense vegetation, chaparral, or scrub. Trees or large shrubs within 30 feet of structures. Wood piles, lumber, or stored organic material. Horse blankets or fabric materials stored near heat sources. Paint, fertilizer, pesticides, or herbicides. Cobwebs, dust, or grain dust accumulation. Structures themselves, especially barns, which are both fuel sources and containers for ignition sources.
+IGNITION SOURCES: Cigarettes, matches, or open flames. Welding equipment or machinery such as trucks, tractors, and mowers that produce sparks. Motors, heaters, or electrical appliances. Fence chargers, electrical fixtures, or exposed wiring. Batteries or electrical panels. Broken glass, which can focus sunlight. Chemicals that may react with each other, with water, or with moisture.
+
+STRUCTURAL AND VEGETATION CONCERNS: Vegetation growing directly up to structure walls with no cleared buffer. Trees, shrubs, or dry grass in close proximity to buildings. Combustible materials stored immediately adjacent to structures. Poor defensible space conditions overall.
 
 Return ONLY a valid JSON array. Each element must have:
-- "name": short hazard name
-- "location_in_image": where in the frame (e.g. "bottom left", "center", "top right")
-- "severity": one of "severe" or "moderate" only — never "minor"
-- "action": one specific, concise, actionable sentence for removal
+ - "name": short hazard name
+ - "location_in_image": where in the frame, for example "bottom left", "center", or "top right"
+ - "severity": one of "severe" or "moderate" only — never "minor"
+ - "action": one specific, concise, actionable sentence for removal or remediation
 
-Example:
+Example output:
 [
-  {
-    "name": "Dead vegetation near structure",
-    "location_in_image": "bottom left",
-    "severity": "severe",
-    "action": "Remove immediately — dry fuel within 30ft of structure"
-  }
-]"""
+   {
+      "name": "Hay bales adjacent to outbuilding",
+      "location_in_image": "bottom left",
+      "severity": "severe",
+      "action": "Relocate hay storage at least 30 feet from all structures immediately"
+   },
+   {
+      "name": "Dense dry vegetation against structure wall",
+      "location_in_image": "center right",
+      "severity": "severe",
+      "action": "Clear all vegetation within 0-5 feet of structure walls to create a non-combustible zone"
+   },
+   {
+      "name": "Large trees within 30 feet of barn",
+      "location_in_image": "top center",
+      "severity": "moderate",
+      "action": "Prune lower branches up to 10 feet from the ground to eliminate ladder fuels"
+   }
+]
+"""
 
 _GROQ_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 

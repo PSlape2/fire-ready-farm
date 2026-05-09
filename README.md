@@ -19,7 +19,6 @@ FireReadyFarm offers two modes of wildfire risk analysis:
 | Key | Purpose | Free sign-up |
 |-----|---------|--------------|
 | `GROQ_API_KEY` | LLaMA Vision hazard detection in the FastAPI backend | [console.groq.com](https://console.groq.com/keys) |
-| `OPENWEATHER_API_KEY` | Live weather data (temp, humidity, wind) in the FastAPI backend | [openweathermap.org](https://home.openweathermap.org/api_keys) |
 | ngrok authtoken | Expose local server to your phone over HTTPS (not in .env — see step 4) | [dashboard.ngrok.com](https://dashboard.ngrok.com/get-started/your-authtoken) |
 
 > **No key needed:** Open-Meteo (frontend weather route) and the local BLIP/CLIP vision models (frontend image analysis) are fully free with no account required.

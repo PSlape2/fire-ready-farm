@@ -22,58 +22,35 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 10px 18px;
+      padding: 8px 18px;
       background: #161b22;
       border-bottom: 1px solid #30363d;
       flex-shrink: 0;
+      gap: 12px;
     }
-    #topbar h1 { font-size: 1rem; font-weight: 600; letter-spacing: .03em; }
+
+    /* Title — left */
+    #topbar h1 { font-size: 1rem; font-weight: 600; letter-spacing: .03em; flex: 1; }
     #topbar h1 span { color: #f78166; }
 
-    /* ── Status + interval controls ── */
-    #status-wrap { display:flex; align-items:center; gap:10px; font-size:.82rem; color:#8b949e; }
-    #status-dot {
-      width:10px; height:10px; border-radius:50%; flex-shrink:0;
-      background:#238636; box-shadow:0 0 6px #238636;
-    }
-    #status-dot.scanning { background:#f78166; box-shadow:0 0 6px #f78166; animation:pulse 1s infinite; }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
-
-    #interval-wrap {
-      display:flex; align-items:center; gap:6px;
-      background:#21262d; border:1px solid #30363d; border-radius:6px;
-      padding:4px 10px; font-size:.75rem;
-    }
-    #interval-wrap label { color:#8b949e; white-space:nowrap; }
-    #interval-wrap b { color:#e6edf3; min-width:24px; display:inline-block; }
-    #interval-slider {
-      width:90px; cursor:pointer;
-      accent-color:#f78166;
-    }
-
-    /* ── FFWI Badge — fixed top-right ── */
+    /* ── FFWI Badge — inline center ── */
     #ffwi-badge {
-      position: fixed;
-      top: 10px;
-      right: 18px;
-      z-index: 200;
       display: flex;
       align-items: center;
       gap: 12px;
       background: #21262d;
       border: 1px solid #30363d;
       border-radius: 8px;
-      padding: 6px 14px;
-      min-width: 170px;
+      padding: 5px 14px;
+      min-width: 160px;
       justify-content: center;
-      box-shadow: 0 2px 12px rgba(0,0,0,.5);
     }
-    #ffwi-score { font-size: 1.5rem; font-weight: 700; }
-    #ffwi-label { font-size: 0.65rem; color: #8b949e; text-transform: uppercase; letter-spacing: .08em; }
+    #ffwi-score { font-size: 1.4rem; font-weight: 700; }
+    #ffwi-label { font-size: 0.62rem; color: #8b949e; text-transform: uppercase; letter-spacing: .08em; }
     #risk-level {
-      font-size: 0.85rem;
+      font-size: 0.82rem;
       font-weight: 700;
-      padding: 3px 10px;
+      padding: 2px 9px;
       border-radius: 20px;
     }
     .risk-Low      { background:#1a4731; color:#56d364; }
@@ -81,12 +58,109 @@
     .risk-High     { background:#3d1300; color:#f78166; }
     .risk-Extreme  { background:#2d1040; color:#d2a8ff; }
 
-    /* ── Main area ── */
-    #main {
+    /* ── Right side controls ── */
+    #controls-wrap {
       display: flex;
+      align-items: center;
+      gap: 10px;
       flex: 1;
-      overflow: hidden;
+      justify-content: flex-end;
     }
+
+    /* Status dot */
+    #status-wrap { display:flex; align-items:center; gap:6px; font-size:.78rem; color:#8b949e; }
+    #status-dot {
+      width:9px; height:9px; border-radius:50%; flex-shrink:0;
+      background:#238636; box-shadow:0 0 6px #238636;
+    }
+    #status-dot.scanning { background:#f78166; box-shadow:0 0 6px #f78166; animation:pulse 1s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+    /* Stop button */
+    #stop-btn {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: .75rem;
+      font-weight: 600;
+      cursor: pointer;
+      background: #2d1300;
+      color: #f78166;
+      border: 1px solid #f78166;
+      transition: opacity .15s;
+    }
+    #stop-btn:hover { opacity: .8; }
+
+    /* Interval controls */
+    #interval-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 4px 10px;
+    }
+    #interval-wrap .interval-label {
+      font-size: .65rem;
+      color: #8b949e;
+    }
+    #interval-wrap .interval-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    #interval-slider {
+      width: 80px;
+      cursor: pointer;
+      accent-color: #f78166;
+    }
+    #interval-wrap .interval-val { font-size:.75rem; color:#e6edf3; min-width:22px; }
+
+    /* ── Stop modal ── */
+    #stop-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 300;
+      background: rgba(0,0,0,0.78);
+      align-items: center;
+      justify-content: center;
+    }
+    #stop-modal-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 16px;
+      padding: 36px 32px;
+      max-width: 320px;
+      width: calc(100% - 32px);
+      text-align: center;
+    }
+    #stop-modal-card .modal-icon { font-size: 2.5rem; margin-bottom: 14px; }
+    #stop-modal-card h2 { font-size: 1.1rem; font-weight: 700; color: #e6edf3; margin-bottom: 6px; }
+    #stop-modal-card p  { font-size: .82rem; color: #8b949e; margin-bottom: 24px; }
+    .modal-btn {
+      display: block;
+      width: 100%;
+      padding: 11px;
+      border-radius: 8px;
+      font-size: .88rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .15s;
+      margin-bottom: 10px;
+      border: none;
+    }
+    .modal-btn:last-child { margin-bottom: 0; }
+    .modal-btn:hover { opacity: .85; }
+    #modal-resume { background: #238636; color: white; }
+    #modal-exit   { background: transparent; color: #8b949e; border: 1px solid #30363d !important; }
+
+    /* ── Main area ── */
+    #main { display: flex; flex: 1; overflow: hidden; }
 
     /* ── Video panel ── */
     #video-wrap {
@@ -120,7 +194,6 @@
       border-left: 1px solid #30363d;
       overflow: hidden;
     }
-
     #right-panel h2 {
       padding: 12px 16px;
       font-size: .82rem;
@@ -130,7 +203,6 @@
       border-bottom: 1px solid #30363d;
       flex-shrink: 0;
     }
-
     #hazard-list { flex: 1; overflow-y: auto; padding: 10px; }
 
     .hazard-card {
@@ -199,26 +271,48 @@
 </head>
 <body>
 
-<!-- Top bar -->
-<div id="topbar">
-  <h1>🔥 Wildfire <span>Hazard Detector</span></h1>
-  <div id="status-wrap">
-    <div id="status-dot"></div>
-    <span id="status-text">Initializing…</span>
-    <div id="interval-wrap">
-      <label>Interval: <b id="interval-val">8s</b></label>
-      <input type="range" id="interval-slider" min="5" max="30" value="8" step="1" />
-    </div>
+<!-- Stop modal -->
+<div id="stop-modal">
+  <div id="stop-modal-card">
+    <div class="modal-icon">⏸</div>
+    <h2>Scanning Paused</h2>
+    <p>What would you like to do?</p>
+    <button class="modal-btn" id="modal-resume">▶ Resume Scanning</button>
+    <button class="modal-btn" id="modal-exit">✕ Exit</button>
   </div>
 </div>
 
-<!-- FFWI badge — fixed top-right, always visible -->
-<div id="ffwi-badge">
-  <div>
-    <div id="ffwi-label">FFWI</div>
-    <div id="ffwi-score">—</div>
+<!-- Top bar -->
+<div id="topbar">
+  <!-- Left: title -->
+  <h1>🔥 Wildfire <span>Hazard Detector</span></h1>
+
+  <!-- Center: FFWI badge -->
+  <div id="ffwi-badge">
+    <div>
+      <div id="ffwi-label">FFWI</div>
+      <div id="ffwi-score">—</div>
+    </div>
+    <span id="risk-level" class="risk-Low">—</span>
   </div>
-  <span id="risk-level" class="risk-Low">—</span>
+
+  <!-- Right: controls -->
+  <div id="controls-wrap">
+    <div id="status-wrap">
+      <div id="status-dot"></div>
+      <span id="status-text">Initializing…</span>
+    </div>
+
+    <div id="interval-wrap">
+      <span class="interval-label">⚙️ Scan Interval</span>
+      <div class="interval-row">
+        <input type="range" id="interval-slider" min="5" max="30" value="8" step="1" />
+        <span class="interval-val"><b id="interval-val">8</b>s</span>
+      </div>
+    </div>
+
+    <button id="stop-btn">⏹ Stop</button>
+  </div>
 </div>
 
 <!-- Main -->
@@ -262,15 +356,33 @@
   const statusText = document.getElementById('status-text');
   const slider     = document.getElementById('interval-slider');
   const intervalEl = document.getElementById('interval-val');
+  const stopBtn    = document.getElementById('stop-btn');
+  const stopModal  = document.getElementById('stop-modal');
 
+  /* ⚙️ SCAN INTERVAL — change default value here */
   let intervalMs = 8000;
   let scanTimer  = null;
 
   // ── Interval slider ──
   slider.addEventListener('input', () => {
     intervalMs = parseInt(slider.value) * 1000;
-    intervalEl.textContent = slider.value + 's';
-    statusText.textContent = `Camera active — scanning every ${slider.value}s`;
+    intervalEl.textContent = slider.value;
+    statusText.textContent = `Active — every ${slider.value}s`;
+  });
+
+  // ── Stop / modal controls ──
+  stopBtn.addEventListener('click', () => {
+    if (scanTimer) { clearTimeout(scanTimer); scanTimer = null; }
+    stopModal.style.display = 'flex';
+  });
+
+  document.getElementById('modal-resume').addEventListener('click', () => {
+    stopModal.style.display = 'none';
+    scanFrame(); // restarts the loop
+  });
+
+  document.getElementById('modal-exit').addEventListener('click', () => {
+    window.location.href = '/';
   });
 
   // ── Camera ──
@@ -343,12 +455,12 @@
     } catch (_) {}
   }
 
-  // ── Scan loop using setTimeout so interval is dynamically adjustable ──
+  // ── Scan loop — uses setTimeout so interval is dynamically adjustable ──
   async function scanFrame() {
     statusDot.classList.add('scanning');
     statusText.textContent = 'Analyzing…';
 
-    await fetchWeather(); // always show weather even if vision fails
+    await fetchWeather(); // always show weather even if vision fails below
 
     try {
       const b64  = captureFrame();
@@ -369,7 +481,7 @@
       showError('Analysis failed: ' + e.message);
     } finally {
       statusDot.classList.remove('scanning');
-      statusText.textContent = `Camera active — scanning every ${slider.value}s`;
+      statusText.textContent = `Active — every ${slider.value}s`;
       scanTimer = setTimeout(scanFrame, intervalMs);
     }
   }
@@ -379,7 +491,7 @@
     const ok = await startCamera();
     if (ok) {
       video.addEventListener('loadeddata', () => {
-        statusText.textContent = `Camera active — scanning every ${slider.value}s`;
+        statusText.textContent = `Active — every ${slider.value}s`;
         scanFrame();
       }, { once: true });
     }

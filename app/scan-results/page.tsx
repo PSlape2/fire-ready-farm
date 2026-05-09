@@ -209,7 +209,6 @@ export default function ScanResultsPage() {
               style={{
                 background: "#1C1917",
                 borderTop: "1px solid rgba(255,255,255,0.08)",
-                divideColor: "#292524",
               }}>
               {[
                 { label: "Frames Analyzed", value: summary.frames_analyzed },

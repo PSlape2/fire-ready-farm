@@ -34,19 +34,13 @@ export interface WeatherApiResponse {
   lon: number;
 }
 
+/** Converts a wind bearing in degrees to a 16-point compass label (e.g. 270 → "W"). */
 function degToCompass(deg: number): string {
   const dirs = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
   return dirs[Math.round(deg / 22.5) % 16];
 }
 
-function celsiusToFahrenheit(c: number): number {
-  return Math.round((c * 9) / 5 + 32);
-}
-
-function mmToInches(mm: number): number {
-  return Math.round((mm / 25.4) * 100) / 100;
-}
-
+/** Converts km/h to mph. Open-Meteo is asked for mph directly; kept for reference. */
 function kphToMph(kph: number): number {
   return Math.round(kph * 0.621371);
 }
@@ -104,15 +98,9 @@ function computeWeatherRisk(w: WeatherData): WeatherRiskScore {
   else precipitationScore = 0;                                 // heavy rain
   precipitationScore = Math.round(precipitationScore);
 
-  // --- Weighted composite ---
-  // Humidity is the heaviest driver (40%), then temp (25%), wind (25%), precip (10%)
-  // const score = Math.round(
-  //   humidityScore    * 0.40 +
-  //   tempScore        * 0.25 +
-  //   windScore        * 0.25 +
-  //   precipitationScore * 0.10
-  // );
-
+  // --- Composite via Equilibrium Moisture Content (EMC) ---
+  // EMC models how dry the fuel is given RH and temperature, then scales by wind.
+  // Three RH ranges use different Nelson EMC equations to match NFDRS moisture tables.
   let emc: number;
   if(w.relativeHumidity <= 10) emc = 0.03229 + 0.281073*w.relativeHumidity - 0.000578*w.relativeHumidity*w.temperature;
   else if(w.relativeHumidity <= 50) emc = 2.22749 + 0.160107*w.relativeHumidity - 0.01478*w.temperature;
@@ -171,6 +159,11 @@ function computeWeatherRisk(w: WeatherData): WeatherRiskScore {
   };
 }
 
+/**
+ * GET /api/weather?lat=&lon=
+ * Fetches current conditions from Open-Meteo and returns weather data plus a
+ * computed fire-weather risk score. Responses are cached for 15 minutes.
+ */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const lat = parseFloat(searchParams.get("lat") ?? "");

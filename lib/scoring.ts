@@ -147,6 +147,12 @@ const RECOMMENDATIONS: Record<RiskLevel, string[]> = {
 // Main export
 // ---------------------------------------------------------------------------
 
+/**
+ * Computes a composite wildfire risk score (0–100) from weather, vegetation,
+ * fire history, and image analysis inputs. Humidity is the highest-weighted
+ * factor (25%), followed by temperature and vegetation (20% / 15%). Returns
+ * the top contributing risk factors and a tier-appropriate recommendation list.
+ */
 export function computeWildfireRisk(input: WildfireRiskInput): WildfireRiskResult {
   const components: Array<{ name: string; score: number; weight: number }> = [
     { name: "Humidity",       score: clamp(scoreHumidity(input.humidity)),           weight: 0.25 },

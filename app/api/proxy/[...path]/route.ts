@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
+/** Base URL of the local Python detection backend (live deep-scan mode). */
 const BACKEND = "http://localhost:8000";
 
+/**
+ * Forwards an incoming Next.js request to the local detection backend,
+ * preserving method, headers, query string, and body.
+ * Used by the Live Deep Scan feature which requires the backend running separately.
+ */
 async function proxy(req: NextRequest, path: string[]): Promise<NextResponse> {
   const url = new URL(`/${path.join("/")}`, BACKEND);
   url.search = new URL(req.url).search;

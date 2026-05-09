@@ -64,6 +64,11 @@ const CHECKLISTS: Record<string, string[]> = {
 // Scoring helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Derives a 0–100 property risk score from the form answers passed as URL
+ * search params. Each factor (vegetation, water source, firebreak, acreage)
+ * contributes a fixed point value that reflects its relative fire risk.
+ */
 function computePropertyScore(params: URLSearchParams): number {
   let score = 0;
   const veg = params.get("vegetationType");
@@ -98,6 +103,7 @@ function computePropertyScore(params: URLSearchParams): number {
   return Math.min(100, Math.max(10, score));
 }
 
+/** Returns a 0–100 display score for a single property factor card. */
 function getPropertyFactorScore(factorId: string, params: URLSearchParams): number {
   switch (factorId) {
     case "vegetation": {
@@ -622,8 +628,12 @@ function ChecklistSection({ items, riskColor }: { items: string[]; riskColor: st
 // Geocode helper
 // ---------------------------------------------------------------------------
 
+/**
+ * Resolves a user-entered location string to lat/lon coordinates.
+ * Tries the Open-Meteo geocoding API first (city name only, no state suffix),
+ * then falls back to Nominatim which handles "City, State" and zip codes natively.
+ */
 async function geocode(location: string): Promise<{ lat: number; lon: number } | null> {
-  // Open-Meteo only does city-name lookup — strip ", CA"-style suffixes first
   const cityName = location.split(",")[0].trim();
 
   try {

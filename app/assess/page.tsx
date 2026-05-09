@@ -184,6 +184,11 @@ export default function AssessPage() {
     router.push(`/results?${params.toString()}`);
   };
 
+  /**
+   * Orchestrates the assessment pipeline: geocodes the location, fetches nearby
+   * fire history from NOAA, optionally runs AI image analysis, then navigates to
+   * the results page with all collected data encoded as URL search params.
+   */
   const handleSubmit = async () => {
     setLoading(true);
     const params = new URLSearchParams({

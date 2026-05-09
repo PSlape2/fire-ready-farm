@@ -24,10 +24,12 @@ let _captionPipe: any = null;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _clipPipe: any = null;
 
+/** Returns the BLIP captioning pipeline, initializing it on first call. */
 async function getCaptionPipe() {
   if (!_captionPipe) _captionPipe = await pipeline("image-to-text", CAPTION_MODEL, { device: "cpu" });
   return _captionPipe;
 }
+/** Returns the CLIP zero-shot classification pipeline, initializing it on first call. */
 async function getClipPipe() {
   if (!_clipPipe) _clipPipe = await pipeline("zero-shot-image-classification", CLIP_MODEL, { device: "cpu" });
   return _clipPipe;
@@ -109,16 +111,19 @@ const HAZARDS = [
 // Helpers
 // ---------------------------------------------------------------------------
 
+/** Maps a 0–1 hazard score to a severity label. */
 function toSeverity(s: number): "low" | "moderate" | "high" {
   if (s >= 0.65) return "high";
   if (s >= 0.38) return "moderate";
   return "low";
 }
 
+/** Weighted sum of per-hazard scores → overall 0–100 image risk score. */
 function computeOverallScore(scores: number[]): number {
   return Math.min(100, Math.round(HAZARDS.reduce((sum, h, i) => sum + h.hazardWeight * scores[i] * 100, 0)));
 }
 
+/** Returns a human-readable summary based on how many hazards were detected. */
 function buildSummary(findings: ImageFinding[]): string {
   const n = findings.filter((f) => f.detected).length;
   if (n >= 4) return "Multiple critical fire hazards detected. Immediate mitigation recommended.";
@@ -131,6 +136,11 @@ function buildSummary(findings: ImageFinding[]): string {
 // Color-analysis fallback — no model required
 // ---------------------------------------------------------------------------
 
+/**
+ * Pixel-level HSL color analysis used when CLIP is unavailable.
+ * Returns one score per HAZARD entry by mapping color distribution
+ * (green vs. brown/yellow vs. gray) to fire risk proxies.
+ */
 async function colorAnalysisFallback(imageBytes: ArrayBuffer): Promise<number[]> {
   const buf = Buffer.from(imageBytes);
   const { data, info } = await sharp(buf)
@@ -178,6 +188,13 @@ async function colorAnalysisFallback(imageBytes: ArrayBuffer): Promise<number[]>
 // Route
 // ---------------------------------------------------------------------------
 
+/**
+ * POST /api/analyze-image  (multipart form: field "image")
+ * Runs CLIP zero-shot classification against each hazard's characteristic
+ * prompts, then falls back to pixel color analysis if CLIP fails.
+ * Returns an ImageAnalysisResult with a 0–100 score, per-hazard findings,
+ * and model debug info.
+ */
 export async function POST(request: NextRequest) {
   let imageBytes: ArrayBuffer;
   let mimeType = "image/jpeg";

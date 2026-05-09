@@ -29,7 +29,7 @@ FireReadyFarm offers two modes of wildfire risk analysis:
 ```
 git clone https://github.com/raw012/WildFireDangerChecker.git
 cd WildFireDangerChecker
-git checkout shallow_deep
+git checkout main
 ```
 
 **2. Set up Python backend**

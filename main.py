@@ -104,15 +104,20 @@ async def fetch_weather(lat: float, lon: float) -> dict:
 # Groq LLaMA Vision hazard detection
 # ---------------------------------------------------------------------------
 
-_HAZARD_PROMPT = """You are a CAL FIRE defensible space expert. Analyze the image and identify all wildfire hazards.
+_HAZARD_PROMPT = """You are a CAL FIRE defensible space expert analyzing an image for wildfire hazards.
+
+Only report hazards that are clearly visible and genuinely dangerous fire risks.
+Do NOT report speculative, minor, or uncertain hazards.
+If the scene is safe with no hazards, return an empty array [] — do not invent hazards.
+An empty array is a valid and preferred response for safe scenes.
+If you are not confident a hazard exists, do not include it.
 
 Return ONLY a valid JSON array. Each element must have:
 - "name": short hazard name
 - "location_in_image": where in the frame (e.g. "bottom left", "center", "top right")
-- "severity": one of "severe", "moderate", "minor"
-- "action": one-sentence removal recommendation
+- "severity": one of "severe" or "moderate" only — never "minor"
+- "action": one specific, concise, actionable sentence for removal
 
-If no hazards detected, return an empty array [].
 Example:
 [
   {
@@ -165,18 +170,12 @@ async def detect_hazards(image_base64: str) -> tuple[list[dict], str]:
 # ---------------------------------------------------------------------------
 
 _URGENCY_MATRIX = {
-    ("Extreme", "severe"): "MUST",
+    ("Extreme", "severe"):   "MUST",
     ("Extreme", "moderate"): "MUST",
-    ("Extreme", "minor"): "SHOULD",
-    ("High", "severe"): "MUST",
-    ("High", "moderate"): "SHOULD",
-    ("High", "minor"): "COULD",
-    ("Moderate", "severe"): "SHOULD",
-    ("Moderate", "moderate"): "COULD",
-    ("Moderate", "minor"): "COULD",
-    ("Low", "severe"): "COULD",
-    ("Low", "moderate"): "MAY",
-    ("Low", "minor"): "MAY",
+    ("High",    "severe"):   "MUST",
+    ("High",    "moderate"): "COULD",
+    ("Moderate","severe"):   "SHOULD",
+    # Low + any severity and Moderate + moderate are excluded (filtered out)
 }
 
 _URGENCY_ORDER = {"MUST": 0, "SHOULD": 1, "COULD": 2, "MAY": 3}
@@ -185,8 +184,10 @@ _URGENCY_ORDER = {"MUST": 0, "SHOULD": 1, "COULD": 2, "MAY": 3}
 def classify_hazards(hazards: list[dict], risk_level: str) -> list[dict]:
     classified = []
     for h in hazards:
-        severity = h.get("severity", "minor")
-        urgency = _URGENCY_MATRIX.get((risk_level, severity), "MAY")
+        severity = h.get("severity", "moderate")
+        urgency = _URGENCY_MATRIX.get((risk_level, severity))
+        if urgency is None:
+            continue
         classified.append({
             "name": h.get("name", "Unknown hazard"),
             "location_in_image": h.get("location_in_image", "unknown"),
@@ -195,6 +196,15 @@ def classify_hazards(hazards: list[dict], risk_level: str) -> list[dict]:
         })
     classified.sort(key=lambda x: _URGENCY_ORDER[x["urgency"]])
     return classified
+
+
+def compute_scene_status(hazards: list[dict]) -> str:
+    if not hazards:
+        return "safe"
+    urgencies = {h["urgency"] for h in hazards}
+    if "MUST" in urgencies or "SHOULD" in urgencies:
+        return "danger"
+    return "attention"
 
 
 def overall_score(risk_level: str, hazards: list[dict]) -> int:
@@ -336,6 +346,7 @@ async def analyze(req: AnalyzeRequest):
         "risk_level": risk_level,
         "weather": weather,
         "hazards": hazards,
+        "scene_status": compute_scene_status(hazards),
         "overall_score": score,
         "model_used": model_used,
         "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
